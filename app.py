@@ -105,7 +105,7 @@ def extract_pdf(file_bytes, filename):
 
                     # Render page at high resolution.
                     # 2x gives Tesseract a better image to work with.
-                    matrix = fitz.Matrix(2, 2)
+matrix = fitz.Matrix(2.5, 2.5)
 
                     pix = page.get_pixmap(
                         matrix=matrix,
