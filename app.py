@@ -728,14 +728,22 @@ if st.session_state.documents:
     with st.expander("Show extracted document details"):
         for document in st.session_state.documents:
             page_label = (
-                f"Page {document['page']}"
-                if document["page"] is not None
-                else "Page not available"
-            )
+    f"Page {document['page']}"
+    if document["page"] is not None
+    else "Page not available"
+)
 
-            st.markdown(
-                f"**{document['filename']}** — {page_label}"
-            )
+source_type = document.get("source_type", "unknown")
+
+if source_type == "ocr":
+    source_label = "🔎 OCR"
+else:
+    source_label = "📄 Text extraction"
+
+st.markdown(
+    f"**{document['filename']}** — "
+    f"{page_label} — {source_label}"
+)
             st.write(document["text"][:1500])
 
     st.info(
