@@ -678,10 +678,23 @@ if load_documents:
         st.session_state.documents = all_documents
         st.session_state.loaded_names = list(dict.fromkeys(all_names))
 
-        st.success(
-            f"Loaded {len(st.session_state.loaded_names)} document(s) "
-            f"and created {len(new_chunks)} chunks."
-        )
+        ocr_pages = sum(
+    1
+    for document in all_documents
+    if document.get("source_type") == "ocr"
+)
+
+if ocr_pages > 0:
+    st.success(
+        f"Loaded {len(st.session_state.loaded_names)} document(s), "
+        f"created {len(new_chunks)} chunks, and OCR processed "
+        f"{ocr_pages} scanned page(s)."
+    )
+else:
+    st.success(
+        f"Loaded {len(st.session_state.loaded_names)} document(s) "
+        f"and created {len(new_chunks)} chunks."
+    )
 
 
 # -----------------------------
