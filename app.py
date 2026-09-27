@@ -121,7 +121,7 @@ matrix = fitz.Matrix(2.5, 2.5)
                     # OCR the image.
                     ocr_text = pytesseract.image_to_string(
                         image,
-                        lang="eng",
+lang="eng+urd"
                         config="--psm 6",
                     )
 
