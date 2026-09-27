@@ -11,6 +11,11 @@ import numpy as np
 import streamlit as st
 from docx import Document
 from pypdf import PdfReader
+
+import pytesseract
+import fitz  # PyMuPDF
+from PIL import Image
+
 from sentence_transformers import SentenceTransformer
 from groq import Groq
 
@@ -45,17 +50,110 @@ def get_groq_client(api_key):
 # Document extraction
 # -----------------------------
 def extract_pdf(file_bytes, filename):
-    reader = PdfReader(io.BytesIO(file_bytes))
+    """
+    Extract text from a PDF.
+
+    First tries normal PDF text extraction with pypdf.
+    If a page has little/no extractable text, OCR is used
+    as a fallback for scanned/image-based pages.
+    """
+
     documents = []
 
+    # ---------------------------------
+    # Step 1: Normal PDF text extraction
+    # ---------------------------------
+    reader = PdfReader(io.BytesIO(file_bytes))
+
+    pages_needing_ocr = []
+
     for page_number, page in enumerate(reader.pages, start=1):
-        text = page.extract_text() or ""
-        if text.strip():
+        try:
+            text = page.extract_text() or ""
+        except Exception:
+            text = ""
+
+        text = text.strip()
+
+        # If enough text exists, use normal extraction.
+        if len(text) >= 20:
             documents.append({
                 "filename": filename,
                 "page": page_number,
-                "text": text.strip(),
+                "text": text,
+                "source_type": "pdf_text",
             })
+        else:
+            # Very little/no text means this may be a scanned page.
+            pages_needing_ocr.append(page_number)
+
+    # ---------------------------------
+    # Step 2: OCR scanned pages
+    # ---------------------------------
+    if pages_needing_ocr:
+
+        try:
+            pdf_document = fitz.open(
+                stream=file_bytes,
+                filetype="pdf",
+            )
+
+            for page_number in pages_needing_ocr:
+
+                try:
+                    page = pdf_document.load_page(page_number - 1)
+
+                    # Render page at high resolution.
+                    # 2x gives Tesseract a better image to work with.
+                    matrix = fitz.Matrix(2, 2)
+
+                    pix = page.get_pixmap(
+                        matrix=matrix,
+                        alpha=False,
+                    )
+
+                    image_bytes = pix.tobytes("png")
+
+                    image = Image.open(
+                        io.BytesIO(image_bytes)
+                    )
+
+                    # OCR the image.
+                    ocr_text = pytesseract.image_to_string(
+                        image,
+                        lang="eng",
+                        config="--psm 6",
+                    )
+
+                    ocr_text = ocr_text.strip()
+
+                    if ocr_text:
+                        documents.append({
+                            "filename": filename,
+                            "page": page_number,
+                            "text": ocr_text,
+                            "source_type": "ocr",
+                        })
+
+                except Exception as exc:
+                    st.warning(
+                        f"OCR failed for {filename}, "
+                        f"page {page_number}: {exc}"
+                    )
+
+            pdf_document.close()
+
+        except Exception as exc:
+            st.error(
+                f"Could not start OCR for {filename}: {exc}"
+            )
+
+    # ---------------------------------
+    # Sort pages back into correct order
+    # ---------------------------------
+    documents.sort(
+        key=lambda item: item["page"]
+    )
 
     return documents
 
